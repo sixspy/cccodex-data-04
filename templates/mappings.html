@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}列映射版本{% endblock %}
+{% block body %}
+<section class="card">
+  <h1>列映射版本</h1>
+  <p class="muted">
+    每个站内目录各自维护「来源列 → 编码 / 标题 / 备注」的对应关系。
+    每保存一次产生一个新版本；已存在的版本只读，不能再改内容。
+    任务在创建时绑定版本，创建后不可改绑；未确认批次可整批换用更新版本重新解析。
+  </p>
+</section>
+{% for cid, cat in catalogs.items() %}
+<section class="card">
+  <h2>目录 {{ cid }} <code>/mock/catalog/{{ cid }}</code></h2>
+  <p class="muted">来源列：
+    {% for c in cat.columns %}<code>{{ c.key }}（{{ c.label }}）</code> {% endfor %}
+  </p>
+  <table>
+    <thead><tr><th>版本</th><th>编码 ←</th><th>标题 ←</th><th>备注 ←</th><th>保存时间</th><th></th></tr></thead>
+    <tbody>
+      {% for m in by_catalog.get(cid, []) %}
+      <tr>
+        <td><strong>v{{ m.version }}</strong></td>
+        <td><code>{{ m.code_col }}</code></td>
+        <td><code>{{ m.title_col }}</code></td>
+        <td><code>{{ m.note_col }}</code></td>
+        <td>{{ m.created_at }}</td>
+        <td><span class="tag">只读</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">尚无版本</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form class="grid-form" method="post" action="{{ url_for('mappings.create') }}">
+    <input type="hidden" name="catalog_id" value="{{ cid }}" />
+    <label>编码 ←
+      <select name="code_col">
+        {% for c in cat.columns %}<option value="{{ c.key }}">{{ c.key }}（{{ c.label }}）</option>{% endfor %}
+      </select>
+    </label>
+    <label>标题 ←
+      <select name="title_col">
+        {% for c in cat.columns %}<option value="{{ c.key }}">{{ c.key }}（{{ c.label }}）</option>{% endfor %}
+      </select>
+    </label>
+    <label>备注 ←
+      <select name="note_col">
+        {% for c in cat.columns %}<option value="{{ c.key }}">{{ c.key }}（{{ c.label }}）</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit">保存为新版本</button>
+  </form>
+</section>
+{% endfor %}
+{% endblock %}

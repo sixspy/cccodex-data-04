@@ -12,6 +12,10 @@
     <strong>Crawl Lab</strong>
     <span class="muted">数据工程基线 · 采集任务编排</span>
     {% if session.get('user') %}
+    <nav class="nav">
+      <a href="{{ url_for('jobs.list_jobs') }}">任务</a>
+      <a href="{{ url_for('mappings.list_all') }}">列映射版本</a>
+    </nav>
     <form class="logout" method="post" action="{{ url_for('auth.logout') }}">
       <span>{{ session.user }}</span>
       <button type="submit">退出</button>

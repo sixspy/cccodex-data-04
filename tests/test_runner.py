@@ -10,11 +10,21 @@ def login(client):
     )
 
 
-def test_run_job_dedup_duplicate_title(app, client):
+def _mapping_id(app, catalog_id, version):
+    with app.app_context():
+        row = get_db().execute(
+            "SELECT id FROM mapping_versions WHERE catalog_id = ? AND version = ?",
+            (catalog_id, version),
+        ).fetchone()
+        return row["id"]
+
+
+def test_run_job_dedup_duplicate_code(app, client):
     login(client)
+    mid = _mapping_id(app, "alpha", 1)
     client.post(
         "/jobs",
-        data={"name": "t1", "seed_path": "/mock/catalog/alpha"},
+        data={"name": "t1", "seed_path": "/mock/catalog/alpha", "mapping_version_id": mid},
         follow_redirects=True,
     )
     with app.app_context():
@@ -23,7 +33,8 @@ def test_run_job_dedup_duplicate_title(app, client):
     assert summary["status"] == "done"
     assert summary["inserted"] == 2
     assert summary["skipped_dup"] == 1
-    assert summary["total_source"] == 3
+    assert summary["failed"] == 1
+    assert summary["total_source"] == 4
 
 
 def test_mock_catalog_http(client):

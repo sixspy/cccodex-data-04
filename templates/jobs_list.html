@@ -12,28 +12,46 @@
         {% endfor %}
       </select>
     </label>
+    <label>列映射版本（创建后不可改绑）
+      <select name="mapping_version_id" required>
+        {% for m in mappings %}
+        <option value="{{ m.id }}">{{ m.catalog_id }} v{{ m.version }} · 编码←{{ m.code_col }} 标题←{{ m.title_col }} 备注←{{ m.note_col }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <button type="submit">创建任务</button>
   </form>
+  <p class="muted">版本与种子目录不匹配会被服务端拒绝；到
+    <a href="{{ url_for('mappings.list_all') }}">列映射版本</a> 页可保存新版本（旧版本只读）。</p>
 </section>
 <section class="card">
   <table>
     <thead>
       <tr>
-        <th>ID</th><th>名称</th><th>种子</th><th>状态</th><th>记录数</th><th></th>
+        <th>ID</th><th>名称</th><th>种子</th><th>绑定版本</th><th>状态</th>
+        <th>批次确认</th><th>失败行</th><th>记录数</th><th></th>
       </tr>
     </thead>
     <tbody>
       {% for j in jobs %}
+      {% set b = batches.get(j.id) %}
       <tr>
         <td>{{ j.id }}</td>
         <td>{{ j.name }}</td>
         <td><code>{{ j.seed_path }}</code></td>
+        <td><span class="tag">{{ j.m_catalog }} v{{ j.m_version }}</span></td>
         <td><span class="tag {{ j.status }}">{{ j.status }}</span></td>
+        <td>
+          {% if not b %}<span class="muted">—</span>
+          {% elif b.confirmed %}<span class="tag done">已确认</span>
+          {% else %}<span class="tag draft">未确认</span>{% endif %}
+        </td>
+        <td>{{ b.failed_count if b else '—' }}</td>
         <td>{{ counts.get(j.id, 0) }}</td>
         <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}">详情</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">尚无任务，请先创建</td></tr>
+      <tr><td colspan="9" class="muted">尚无任务，请先创建</td></tr>
       {% endfor %}
     </tbody>
   </table>

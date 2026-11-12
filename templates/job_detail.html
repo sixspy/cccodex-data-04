@@ -5,29 +5,125 @@
 <section class="card">
   <h1>{{ job.name }}</h1>
   <p>种子 <code>{{ job.seed_path }}</code> · 状态 <span class="tag {{ job.status }}">{{ job.status }}</span></p>
+  {% if bound %}
+  <p>创建时绑定版本：<strong>{{ bound.catalog_id }} v{{ bound.version }}</strong>
+    （编码←{{ bound.code_col }}，标题←{{ bound.title_col }}，备注←{{ bound.note_col }}）。
+    绑定在创建后不可更改；未确认批次只能通过「重新解析」整批换用更新版本。</p>
+  {% endif %}
   {% if job.status == 'draft' %}
   <form method="post" action="{{ url_for('jobs.run_job_view', job_id=job.id) }}">
     <button type="submit">运行采集（同步）</button>
   </form>
-  {% elif job.status == 'done' %}
-  <p class="muted">已完成于 {{ job.finished_at or '—' }}</p>
+  {% elif job.status == 'running' %}
+  <p class="muted">上一次运行尚未结束，不能再次触发。</p>
   {% endif %}
 </section>
+
+{% if batch %}
 <section class="card">
-  <h2>落库记录</h2>
+  <h2>当前批次 #{{ batch.id }}</h2>
+  <p>解析版本 <strong>{{ batch_mapping.catalog_id }} v{{ batch_mapping.version }}</strong>
+    · 写入 {{ batch.inserted_count }} 条 · 失败 {{ batch.failed_count }} 行
+    · 完成于 {{ batch.finished_at or '—' }}
+    · {% if batch.confirmed %}<span class="tag done">已确认冻结</span>{% else %}<span class="tag draft">未确认</span>{% endif %}
+  </p>
+  {% if batch.confirmed %}
+  <p class="muted">批次已确认冻结：不能重新解析，也不能改标题。</p>
+  {% else %}
+  <form class="inline-form" method="post" action="{{ url_for('jobs.confirm_view', job_id=job.id) }}">
+    <button type="submit">确认批次（冻结）</button>
+  </form>
+  {% if newer_versions %}
+  <form class="inline-form" method="post" action="{{ url_for('jobs.replay_view', job_id=job.id) }}">
+    <label>换用更新版本
+      <select name="mapping_version_id">
+        {% for m in newer_versions %}
+        <option value="{{ m.id }}">{{ m.catalog_id }} v{{ m.version }} · 编码←{{ m.code_col }} 标题←{{ m.title_col }} 备注←{{ m.note_col }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">重新解析（先整批撤出再写入）</button>
+  </form>
+  {% else %}
+  <p class="muted">暂无更新的映射版本；到「列映射版本」页保存新版本后可重新解析。</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>正式结果（落库记录）</h2>
   <table>
-    <thead><tr><th>item_key</th><th>标题</th><th>时间</th></tr></thead>
+    <thead>
+      <tr>
+        <th>编码</th><th>标题</th><th>备注</th><th>时间</th>
+        {% if batch and not batch.confirmed %}<th>改标题</th>{% endif %}
+      </tr>
+    </thead>
     <tbody>
       {% for r in records %}
       <tr>
-        <td><code>{{ r.item_key }}</code></td>
+        <td><code>{{ r.code }}</code></td>
         <td>{{ r.title }}</td>
+        <td>{{ r.note }}</td>
         <td>{{ r.fetched_at }}</td>
+        {% if batch and not batch.confirmed %}
+        <td>
+          <form class="inline-form" method="post" action="{{ url_for('jobs.edit_record_title', record_id=r.id) }}">
+            <input name="title" value="{{ r.title }}" required />
+            <button type="submit">保存</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
       {% else %}
-      <tr><td colspan="3" class="muted">尚无记录</td></tr>
+      <tr><td colspan="5" class="muted">尚无记录</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </section>
+
+<section class="card">
+  <h2>失败行（未入库）</h2>
+  <p class="muted">来源中缺少编码的行不计入正式结果，只在这里留痕说明。</p>
+  <table>
+    <thead><tr><th>来源行号</th><th>原因</th><th>被丢弃的标题</th></tr></thead>
+    <tbody>
+      {% for f in failures %}
+      <tr>
+        <td>{{ f.row_index }}</td>
+        <td>{{ f.reason }}</td>
+        <td>{{ f.raw_title or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">无失败行</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if batches %}
+<section class="card">
+  <h2>历史批次</h2>
+  <table>
+    <thead><tr><th>批次</th><th>解析版本</th><th>状态</th><th>写入</th><th>失败</th><th>时间</th></tr></thead>
+    <tbody>
+      {% for b in batches %}
+      <tr>
+        <td>#{{ b.id }}</td>
+        <td>{{ b.m_catalog }} v{{ b.m_version }}</td>
+        <td>
+          {% if b.superseded %}<span class="tag failed">已撤出</span>
+          {% elif b.confirmed %}<span class="tag done">已确认</span>
+          {% else %}<span class="tag draft">未确认</span>{% endif %}
+        </td>
+        <td>{{ b.inserted_count }}</td>
+        <td>{{ b.failed_count }}</td>
+        <td>{{ b.finished_at or b.created_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 {% endblock %}
